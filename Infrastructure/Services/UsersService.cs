@@ -114,6 +114,78 @@ public class UsersService(DataContext context) : IUsersService
             : new Response<GetUserDTO>(getUserDto);
     }
 
+    public async Task<Response<List<GetUserDTO>>> GetNewRegisters()
+    {
+        var now = DateTime.Now;
+        
+        var users = await context.Users
+            .Where(u => now.AddDays(-14) <= u.JoinDate).ToListAsync();
+        
+        var data = users
+            .Select(u => new GetUserDTO()
+            {
+                Id = u.Id,
+                Username = u.Username,
+                Email = u.Email,
+                Bio = u.Bio,
+                JoinDate = u.JoinDate
+            }).ToList();
+        
+        return new Response<List<GetUserDTO>>(data);
+    }
+
+    public async Task<Response<List<ActivePosterDto>>> ActivePosters()
+    {
+        var activeUsers = await context.Users
+            .Include(u => u.Posts)
+            .Where(u => u.Posts.Count > 0).ToListAsync();
+
+        var data = activeUsers
+            .Select(u => new ActivePosterDto()
+            {
+                Username = u.Username,
+                PostCount = u.Posts.Count
+            }).ToList();
+        
+        return new Response<List<ActivePosterDto>>(data);
+    }
+
+
+    public async Task<Response<List<RecentlyActiveUserDto>>> RecentlyActive()
+    {
+        var sevenDaysAgo = DateTime.UtcNow.AddDays(-7);
+
+        var activeUsers = await context.Users
+        .Where(u => u.Posts.Any(p => p.CreatedAt >= sevenDaysAgo))
+        .Select(u => new RecentlyActiveUserDto
+        {
+            Username = u.Username,
+            LastPostDate = u.Posts
+                .Where(p => p.CreatedAt >= sevenDaysAgo)
+                .Max(p => p.CreatedAt),
+            PostCount = u.Posts
+                .Count(p => p.CreatedAt >= sevenDaysAgo)
+        })
+        .OrderByDescending(u => u.LastPostDate)
+        .ToListAsync();
+
+        return new Response<List<RecentlyActiveUserDto>>(activeUsers);
+    }
+
+    public async Task<Response<List<TopCreatorDto>>> TopCreatorsAsync()
+    {
+        var topCreators = await context.Users
+            .OrderByDescending(u => u.Posts.Count)
+            .Take(5)
+            .Select(u => new TopCreatorDto
+            {
+                Username = u.Username,
+                PostCount = u.Posts.Count
+            })
+            .ToListAsync();
+
+        return new Response<List<TopCreatorDto>>(topCreators);
+    }
 
     public async Task<Response<List<HighInteractionUserDto>>> HighInteraction()
     {
@@ -145,43 +217,5 @@ public class UsersService(DataContext context) : IUsersService
         
         return new Response<List<HighInteractionUserDto>>(list);
     }
-
-    public async Task<Response<List<GetUserDTO>>> GetNewRegisters()
-    {
-        var now = DateTime.Now;
-        
-        var users = await context.Users
-            .Where(u => now.AddDays(-14) <= u.JoinDate).ToListAsync();
-        
-        var data = users
-            .Select(u => new GetUserDTO()
-            {
-                Id = u.Id,
-                Username = u.Username,
-                Email = u.Email,
-                Bio = u.Bio,
-                JoinDate = u.JoinDate
-            }).ToList();
-        
-        return new Response<List<GetUserDTO>>(data);
-    }
-
-    // public async Task<Response<List<ActivePosterDto>>> ActivePosters()
-    // {
-    //     var activeUsers = await context.Users
-    //         .Include(u => u.Posts)
-    //         .Where(u => u.Posts.Count > 0).ToListAsync();
-
-    //     var data = activeUsers
-    //         .Select(u => new ActivePosterDto()
-    //         {
-    //             UserName = u.Username,
-    //             PostCount = u.Posts.Count
-    //         }).ToList();
-        
-    //     return new Response<List<ActivePosterDto>>(data);
-    // }
-
-
     
 }
